@@ -1,0 +1,18 @@
+name = "lifeflow-worker"
+main = "src/index.js"
+compatibility_date = "2024-07-14"
+
+[vars]
+# 非敏感配置（可在仓库中保留）
+OPENAI_BASE_URL = "https://sub2api-qbxihjpy.sealoshzh.site"
+MODEL_NAME = "gpt-5.5"
+
+# 敏感配置请务必通过 wrangler secret put 设置，不要写在这里：
+#   wrangler secret put JWT_SECRET
+#   wrangler secret put OPENAI_API_KEY
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lifeflow"
+# 生产部署前必须替换为实际 database_id
+database_id = "e6ba4df8-9e15-41e7-9ae7-d1a8cf969104"

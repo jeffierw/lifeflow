@@ -1,0 +1,22 @@
+{
+  "name": "lifeflow-worker",
+  "version": "1.0.0",
+  "description": "LifeFlow Cloudflare Worker Backend",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute lifeflow-db --file=./schema.sql",
+    "db:migrate": "wrangler d1 execute lifeflow-db --file=./migrations/001_init.sql"
+  },
+  "keywords": ["lifeflow", "worker", "cloudflare"],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2"
+  }
+}
