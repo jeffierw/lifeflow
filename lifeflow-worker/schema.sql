@@ -4,10 +4,12 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   nickname TEXT DEFAULT '',
   avatar TEXT DEFAULT '',
+  voice_settings TEXT DEFAULT '{}',
+  speech_keywords TEXT DEFAULT '["下一步", "哈吉米"]',
   quota_total INTEGER DEFAULT 10000000,
   quota_used INTEGER DEFAULT 0,
   created_at INTEGER DEFAULT (strftime('%s', 'now')),
-  updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+  updated_at INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS invites (

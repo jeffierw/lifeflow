@@ -5,7 +5,7 @@ import Header from '../components/Header'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Card, CardContent } from '../components/ui/Card'
-import { authAPI, inviteAPI } from '../api'
+import { authAPI } from '../api'
 import authStore from '../store/authStore'
 
 export default function Auth() {
@@ -30,8 +30,8 @@ export default function Auth() {
         login(response.user, response.token)
         navigate('/')
       } else {
-        await inviteAPI.validate(inviteCode)
-        const response = await authAPI.register({ email, password, inviteCode })
+        await authAPI.register({ email, password, inviteCode })
+        const response = await authAPI.login({ email, password })
         login(response.user, response.token)
         navigate('/onboarding')
       }

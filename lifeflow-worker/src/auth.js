@@ -34,6 +34,11 @@ export class AuthHandler {
   }
 
   async register() {
+    if (!this.env.JWT_SECRET) {
+      console.error('JWT_SECRET not configured')
+      return createError('服务器配置错误：缺少 JWT_SECRET', 500)
+    }
+
     const body = await parseBody(this.request)
     const { email, password, inviteCode } = body
 
@@ -79,6 +84,11 @@ export class AuthHandler {
   }
 
   async login() {
+    if (!this.env.JWT_SECRET) {
+      console.error('JWT_SECRET not configured')
+      return createError('服务器配置错误：缺少 JWT_SECRET', 500)
+    }
+
     const body = await parseBody(this.request)
     const { email, password } = body
 

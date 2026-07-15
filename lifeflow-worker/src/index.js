@@ -18,12 +18,33 @@ async function initDB(env) {
         id TEXT PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
+        nickname TEXT DEFAULT '',
+        avatar TEXT DEFAULT '',
+        voice_settings TEXT DEFAULT '{}',
+        speech_keywords TEXT DEFAULT '["下一步", "哈吉米"]',
         quota_total INTEGER DEFAULT 10000000,
         quota_used INTEGER DEFAULT 0,
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
-        updated_at INTEGER
+        updated_at INTEGER DEFAULT 0
       )
     `).run()
+
+    // 为已存在的老表补齐字段（已存在时 ALTER 会报错，忽略即可）
+    const addColumn = async (sql) => {
+      try {
+        await env.DB.prepare(sql).run()
+      } catch (error) {
+        if (!error.message?.includes('duplicate column')) {
+          console.error('Add column failed:', sql, error)
+        }
+      }
+    }
+
+    await addColumn("ALTER TABLE users ADD COLUMN nickname TEXT DEFAULT ''")
+    await addColumn("ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT ''")
+    await addColumn("ALTER TABLE users ADD COLUMN voice_settings TEXT DEFAULT '{}'")
+    await addColumn(`ALTER TABLE users ADD COLUMN speech_keywords TEXT DEFAULT '["下一步", "哈吉米"]'`)
+    await addColumn("ALTER TABLE users ADD COLUMN updated_at INTEGER DEFAULT 0")
 
     await env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS invites (
