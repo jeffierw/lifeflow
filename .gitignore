@@ -33,6 +33,9 @@ pnpm-debug.log*
 .trae
 .trae-html-share-packages
 
+# GitHub CLI local config
+.gh-config
+
 # Editors
 .vscode/*
 !.vscode/extensions.json
