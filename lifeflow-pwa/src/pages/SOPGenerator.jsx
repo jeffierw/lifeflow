@@ -103,12 +103,20 @@ export default function SOPGenerator() {
       conversationHistory,
       {
         onChunk: (_chunk, fullContent) => {
-          // 实时显示累积的 AI 输出（本地/无 API key 时可能是 JSON 文本）
-          setMessages(prev => prev.map(msg =>
-            msg.id === thinkingMessageId
-              ? { ...msg, content: fullContent }
-              : msg
-          ))
+          // 从累积的 JSON 中提取 text 字段值，只显示问题文本
+          let match = fullContent.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+          if (!match) {
+            // text 字段还在传输中（引号未闭合）
+            match = fullContent.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)$/)
+          }
+          if (match) {
+            const displayText = match[1]
+            setMessages(prev => prev.map(msg =>
+              msg.id === thinkingMessageId
+                ? { ...msg, content: displayText }
+                : msg
+            ))
+          }
         },
         onDone: (response) => {
           const followUpQuestions = response.questions || []
@@ -122,11 +130,11 @@ export default function SOPGenerator() {
               options: question.options || [],
             })
 
+            // 不替换 content，流式输出的文本即为最终显示
             setMessages(prev => prev.map(msg =>
               msg.id === thinkingMessageId
                 ? {
                     ...msg,
-                    content: question.text,
                     options: question.options || [],
                     isStreaming: false,
                   }
@@ -183,7 +191,20 @@ export default function SOPGenerator() {
   const handleGenerate = async () => {
     setLoading(true)
     try {
-      const response = await sopAPI.generate(goal, {})
+      const conversationHistory = []
+      let lastQuestion = null
+      messages.filter(m => m.role === 'user' || m.role === 'assistant').forEach((msg) => {
+        if (msg.role === 'assistant') {
+          lastQuestion = msg.content
+        } else if (msg.role === 'user' && lastQuestion) {
+          conversationHistory.push({
+            question: lastQuestion,
+            answer: msg.content,
+          })
+          lastQuestion = null
+        }
+      })
+      const response = await sopAPI.generate(goal, { conversationHistory, answers })
       const sop = response.sop || mockSOP
       setCurrentSop(sop)
       playSuccess()
@@ -328,7 +349,7 @@ export default function SOPGenerator() {
                 )
               })}
 
-              {loading && (
+              {loading && messages[messages.length - 1]?.role !== 'assistant' && (
                 <div className="flex gap-3">
                   <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full bg-[#f0f0f0] text-[#3d3d3d]">
                     🤔

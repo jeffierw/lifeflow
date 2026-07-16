@@ -9,12 +9,12 @@ export const useSpeech = (voiceSettings = {}) => {
     const loadVoices = () => {
       const availableVoices = window.speechSynthesis.getVoices()
       setVoices(availableVoices)
-      
+
       const zhVoices = availableVoices.filter(v => v.lang.includes('zh'))
       if (zhVoices.length > 0) {
-        const femaleVoice = zhVoices.find(v => 
-          v.name.includes('Female') || 
-          v.name.includes('Lili') || 
+        const femaleVoice = zhVoices.find(v =>
+          v.name.includes('Female') ||
+          v.name.includes('Lili') ||
           v.name.includes('Xiaoxiao') ||
           v.name.includes('Mei') ||
           v.name.includes('Yunxi')
@@ -38,15 +38,15 @@ export const useSpeech = (voiceSettings = {}) => {
   const speak = useCallback((text) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
-      
+
       const utterance = new SpeechSynthesisUtterance(text)
       utterance.lang = 'zh-CN'
       utterance.rate = voiceSettings.rate || 1
       utterance.pitch = voiceSettings.pitch || 1.1
       utterance.volume = 1
-      
+
       const availableVoices = window.speechSynthesis.getVoices()
-      
+
       if (voiceSettings.voiceName) {
         const configuredVoice = availableVoices.find(v => v.name === voiceSettings.voiceName)
         if (configuredVoice) {
@@ -57,9 +57,9 @@ export const useSpeech = (voiceSettings = {}) => {
       } else {
         const zhVoices = availableVoices.filter(v => v.lang.includes('zh'))
         if (zhVoices.length > 0) {
-          const femaleVoice = zhVoices.find(v => 
-            v.name.includes('Female') || 
-            v.name.includes('Lili') || 
+          const femaleVoice = zhVoices.find(v =>
+            v.name.includes('Female') ||
+            v.name.includes('Lili') ||
             v.name.includes('Xiaoxiao') ||
             v.name.includes('Mei') ||
             v.name.includes('Yunxi') ||
@@ -68,7 +68,7 @@ export const useSpeech = (voiceSettings = {}) => {
           utterance.voice = femaleVoice
         }
       }
-      
+
       utteranceRef.current = utterance
       window.speechSynthesis.speak(utterance)
     }
@@ -95,7 +95,7 @@ export const useSpeechRecognition = (onResult, onError) => {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     const recognition = new SpeechRecognition()
-    
+
     recognition.lang = 'zh-CN'
     recognition.continuous = false
     recognition.interimResults = false

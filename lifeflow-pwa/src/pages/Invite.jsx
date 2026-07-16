@@ -76,7 +76,7 @@ export default function Invite() {
                 )}
                 <Button
                   size="sm"
-                  onClick={() => navigate('/auth')}
+                  onClick={() => navigate('/auth', { state: { mode: 'register', email } })}
                 >
                   去注册
                 </Button>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import Header from '../components/Header'
 import { Button } from '../components/ui/Button'
@@ -10,9 +10,10 @@ import authStore from '../store/authStore'
 
 export default function Auth() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = authStore()
-  const [isLogin, setIsLogin] = useState(true)
-  const [email, setEmail] = useState('')
+  const [isLogin, setIsLogin] = useState(location.state?.mode !== 'register')
+  const [email, setEmail] = useState(location.state?.email || '')
   const [password, setPassword] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -109,10 +110,19 @@ export default function Auth() {
 
               {!isLogin && (
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-semibold text-[#3d3d3d]">
-                    <User size={16} />
-                    <span>邀请码</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-[#3d3d3d]">
+                      <User size={16} />
+                      <span>邀请码</span>
+                    </label>
+                    <button
+                      type="button"
+                      className="text-xs text-[#ff8c42] font-semibold border-b border-[#ff8c42] pb-0.5 hover:text-[#e07a36] transition-colors"
+                      onClick={() => navigate('/invite')}
+                    >
+                      申请邀请码
+                    </button>
+                  </div>
                   <Input
                     type="text"
                     value={inviteCode}

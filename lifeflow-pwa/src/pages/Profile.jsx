@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, Mail, CreditCard, Save, ArrowLeft, Edit3, RefreshCw, Loader2, ImagePlus } from 'lucide-react'
 import Header from '../components/Header'
@@ -14,13 +14,12 @@ export default function Profile() {
   const navigate = useNavigate()
   const { user, logout, setUser } = authStore()
   const { playClick, playSuccess, playError } = useSound()
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState(user)
+  const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [nickname, setNickname] = useState('')
-  const [avatar, setAvatar] = useState('')
+  const [nickname, setNickname] = useState(user?.nickname || '')
+  const [avatar, setAvatar] = useState(user?.avatar || '')
   const [toast, setToast] = useState(null)
-  const loadedRef = useRef(false)
   const loadProfileRef = useRef(async () => {})
 
   loadProfileRef.current = async () => {
@@ -37,12 +36,6 @@ export default function Profile() {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    if (loadedRef.current) return
-    loadedRef.current = true
-    loadProfileRef.current()
-  }, [])
 
   const handleSave = async () => {
     playClick()
@@ -66,12 +59,7 @@ export default function Profile() {
   }
 
   const formatQuota = (bytes) => {
-    if (bytes >= 1024 * 1024) {
-      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
-    } else if (bytes >= 1024) {
-      return `${(bytes / 1024).toFixed(2)} KB`
-    }
-    return `${bytes} B`
+    return bytes.toString()
   }
 
   const quotaPercentage = profile ? ((profile.quota_used / profile.quota_total) * 100).toFixed(1) : 0

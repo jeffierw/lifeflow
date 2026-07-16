@@ -16,7 +16,7 @@ import { sopAPI } from '../api'
 export default function SOPExecutor() {
   const navigate = useNavigate()
   const params = useParams()
-  const { currentSop, stepIndex, setStepIndex, nextStep, prevStep, updateStep, startExecution, stopExecution } = sopStore()
+  const { currentSop, setCurrentSop, stepIndex, setStepIndex, nextStep, prevStep, updateStep, startExecution, stopExecution } = sopStore()
   const { speechKeywords, voiceSettings } = authStore()
   const [sop, setSop] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)

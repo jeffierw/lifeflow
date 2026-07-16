@@ -116,11 +116,31 @@ export class SOPHandler {
       throw new Error('API key not configured')
     }
 
+    const { conversationHistory, answers } = constraints || {}
+
+    const historyText = conversationHistory && conversationHistory.length > 0
+      ? conversationHistory.map((item, index) => `Q${index + 1}: ${item.question}\nA${index + 1}: ${item.answer}`).join('\n')
+      : ''
+
+    const answersText = answers && Object.keys(answers).length > 0
+      ? Object.values(answers).map((v, i) => `${i + 1}. ${v}`).join('\n')
+      : ''
+
     const prompt = `
-你是一个专业的生活任务规划师。请根据用户的目标生成一个详细的 SOP（标准操作程序）。
+你是一个专业的生活任务规划师。请根据用户的目标和已有对话信息生成一个详细的 SOP（标准操作程序）。
 
 用户目标：${goal}
-约束条件：${JSON.stringify(constraints || {})}
+
+【用户已确认的信息】
+${answersText || '暂无'}
+
+【对话记录】
+${historyText || '暂无'}
+
+【重要要求】
+1. 必须严格使用用户在对话中确认的信息（如菜单、食材、时间等），绝对不能自行编造或替换
+2. 如果用户提到了具体菜品/食材/方案，SOP 中必须使用这些内容
+3. 只输出 JSON，不要包含其他文本
 
 请输出一个 JSON 格式的 SOP，包含以下字段：
 - title: SOP 的标题
@@ -133,8 +153,24 @@ export class SOPHandler {
   - dependencies: 依赖的步骤 ID 数组（可选）
 - estimatedTotalTime: 总预计耗时（分钟）
 
-请确保步骤之间有合理的依赖关系，时间估算合理。只输出 JSON，不要包含其他文本。
+请确保步骤之间有合理的依赖关系，时间估算合理。
     `.trim()
+
+    const messages = [
+      {
+        role: 'system',
+        content: '你是一个专业的生活任务规划师，擅长将复杂任务分解为清晰的步骤流程。你必须严格遵循用户提供的信息，不得编造。'
+      }
+    ]
+
+    if (conversationHistory && conversationHistory.length > 0) {
+      for (const item of conversationHistory) {
+        messages.push({ role: 'assistant', content: item.question })
+        messages.push({ role: 'user', content: item.answer })
+      }
+    }
+
+    messages.push({ role: 'user', content: prompt })
 
     const response = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: 'POST',
@@ -144,16 +180,7 @@ export class SOPHandler {
       },
       body: JSON.stringify({
         model: this.env.MODEL_NAME || 'gpt-5.5',
-        messages: [
-          {
-            role: 'system',
-            content: '你是一个专业的生活任务规划师，擅长将复杂任务分解为清晰的步骤流程。'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
+        messages,
         temperature: 0.7,
       }),
     })
@@ -219,56 +246,46 @@ export class SOPHandler {
 
     try {
       const historyText = conversationHistory && conversationHistory.length > 0
-        ? conversationHistory.map((item, index) => `Q${index + 1}: ${item.question}\nA${index + 1}: ${item.answer}`).join('\n\n')
+        ? conversationHistory.map((item, index) => `${index + 1}. 问：${item.question}\n   答：${item.answer}`).join('\n')
         : ''
 
       const prompt = `
-你是一个专业的生活任务规划师，正在帮助用户创建一个详细的 SOP。
-
 用户目标：${goal}
 
-【已有信息】
-${JSON.stringify(answers || {})}
-
-【历史对话】
+【已经问过的问题和用户回答（绝对不能重复这些问题）】
 ${historyText || '暂无'}
 
-【任务要求】
-1. 首先仔细分析已有信息和历史对话，列出所有已经确认的信息点
-2. 对比用户目标，找出真正缺失的关键信息
-3. 如果已有信息足够详细可以生成完整SOP，返回空数组
-4. 如果需要追问，每轮只问1个问题，优先使用是否题
-5. 绝对禁止重复提问！即使问题表述略有不同但核心内容相同也不行
+请仔细阅读以上对话记录。你已经问过的任何问题绝对不能再次提问，即使用不同的表述方式也不行。
 
-【重复提问判断标准】
-- 相同主题的问题只问一次（例如：问过"户型"就不能再问"面积"）
-- 已经得到明确答案的问题不能再问
-- 用户回答中已经包含的信息不需要再确认
+【任务】
+1. 分析已有信息，判断是否已足够生成 SOP
+2. 如果信息足够，返回：{"questions": [], "message": "信息已足够，可以生成 SOP"}
+3. 如果还需要信息，只问1个新的问题（不能与上面任何问题重复或相似）
 
-【已确认信息分析】
-请在思考过程中确认以下信息是否已经明确：
-${answers && Object.keys(answers).length > 0 
-  ? Object.values(answers).map((v, i) => `${i + 1}. ${v}`).join('\n') 
-  : '暂无'}
+【提问格式】
+- 是否题：type="choice", options=["是", "否"]
+- 选择题：type="choice", options不超过4个
+- 填空题：type="input", options=[]
 
-【提问策略】
-- 是否题格式："xxx吗？"，options: ["是", "否"]
-- 选择题格式："xxx？"，options: ["选项1", "选项2", "选项3", "选项4"]（不超过4个）
-- 必须提问时才使用input类型
-
-【输出格式】
-请只输出 JSON 格式：
-{
-  "questions": [
-    {
-      "text": "问题文本",
-      "type": "choice" | "input",
-      "options": ["是", "否"]
-    }
-  ]
-}
-注意：questions数组最多包含1个问题，不需要追问时返回空数组
+只输出 JSON：
+{"questions": [{"text": "问题文本", "type": "choice", "options": ["是", "否"]}]}
       `.trim()
+
+      const messages = [
+        {
+          role: 'system',
+          content: '你是一个专业的生活任务规划师，通过提问收集信息来创建SOP。你绝不重复已问过的问题。如果用户已经回答了某个问题，你不能再以任何形式再次提问相同或相似的内容。'
+        }
+      ]
+
+      if (conversationHistory && conversationHistory.length > 0) {
+        for (const item of conversationHistory) {
+          messages.push({ role: 'assistant', content: item.question })
+          messages.push({ role: 'user', content: item.answer })
+        }
+      }
+
+      messages.push({ role: 'user', content: prompt })
 
       const openaiResponse = await fetch(`${baseUrl}/v1/chat/completions`, {
         method: 'POST',
@@ -278,17 +295,8 @@ ${answers && Object.keys(answers).length > 0
         },
         body: JSON.stringify({
           model: this.env.MODEL_NAME || 'gpt-5.5',
-          messages: [
-            {
-              role: 'system',
-              content: '你是一个专业的生活任务规划师，擅长通过简短的问题收集信息来完善任务规划。'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: 0.5,
+          messages,
+          temperature: 0.3,
           stream: true,
         }),
       })
@@ -322,11 +330,17 @@ ${answers && Object.keys(answers).length > 0
 
   streamAskResponse(result) {
     const encoder = new TextEncoder()
+    const content = JSON.stringify(result)
     const stream = new ReadableStream({
-      start(controller) {
-        const content = JSON.stringify(result)
-        const chunk = JSON.stringify({ choices: [{ delta: { content } }] })
-        controller.enqueue(encoder.encode(`data: ${chunk}\n\n`))
+      async start(controller) {
+        // 分块发送，模拟流式输出
+        const chunkSize = 5
+        for (let i = 0; i < content.length; i += chunkSize) {
+          const piece = content.slice(i, i + chunkSize)
+          const chunk = JSON.stringify({ choices: [{ delta: { content: piece } }] })
+          controller.enqueue(encoder.encode(`data: ${chunk}\n\n`))
+          await new Promise(resolve => setTimeout(resolve, 30))
+        }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
         controller.close()
       }

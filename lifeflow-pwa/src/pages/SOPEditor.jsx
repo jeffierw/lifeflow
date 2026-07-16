@@ -231,9 +231,11 @@ export default function SOPEditor() {
               <Clock size={14} />
               <span>预计总时长：{sop.estimatedTotalTime || 60} 分钟</span>
             </div>
-            {sop.constraints && (
+            {sop.constraints && Object.entries(sop.constraints).some(([_, v]) => typeof v === 'string' || typeof v === 'number') && (
               <div className="flex flex-wrap gap-2">
-                {Object.entries(sop.constraints).map(([key, value]) => (
+                {Object.entries(sop.constraints)
+                  .filter(([_, value]) => typeof value === 'string' || typeof value === 'number')
+                  .map(([key, value]) => (
                   <span key={key} className="bg-white px-3 py-1 text-xs text-accent border border-border">
                     {value}
                   </span>
