@@ -273,7 +273,7 @@ ${answers && Object.keys(answers).length > 0
 注意：questions数组最多包含1个问题，不需要追问时返回空数组
       `.trim()
 
-      const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+      const openaiResponse = await fetch(`${baseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -292,25 +292,30 @@ ${answers && Object.keys(answers).length > 0
             }
           ],
           temperature: 0.5,
+          stream: true,
         }),
       })
 
-      const data = await response.json()
-      const content = data.choices?.[0]?.message?.content
-
-      if (content) {
-        const jsonMatch = content.match(/\{[\s\S]*\}/)
-        if (jsonMatch) {
-          const result = JSON.parse(jsonMatch[0])
-          followUpQuestions = result.questions || []
-        }
+      if (!openaiResponse.ok) {
+        const errorText = await openaiResponse.text().catch(() => 'AI request failed')
+        console.error('AI ask failed:', openaiResponse.status, errorText)
+        return createError('AI 请求失败', openaiResponse.status)
       }
+
+      const tokensUsed = calculateTokens(goal + JSON.stringify(answers || {}))
+      await this.updateQuota(user.id, tokensUsed, 'ask')
+
+      return new Response(openaiResponse.body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      })
     } catch (error) {
       console.error('AI ask failed:', error)
     }
-
-    const tokensUsed = calculateTokens(goal + JSON.stringify(answers || {}))
-    await this.updateQuota(user.id, tokensUsed, 'ask')
 
     return createResponse({
       questions: followUpQuestions.slice(0, 1),

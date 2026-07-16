@@ -71,59 +71,86 @@ export default function SOPGenerator() {
     askQuestion()
   }
 
-  const askQuestion = async () => {
+  const askQuestion = () => {
     setLoading(true)
-    try {
-      const conversationHistory = []
-      let lastQuestion = null
-      messages.filter(m => m.role === 'user' || m.role === 'assistant').forEach((msg) => {
-        if (msg.role === 'assistant') {
-          lastQuestion = msg.content
-        } else if (msg.role === 'user' && lastQuestion) {
-          conversationHistory.push({
-            question: lastQuestion,
-            answer: msg.content,
-          })
-          lastQuestion = null
-        }
-      })
-      
-      const response = await sopAPI.ask(goal, currentQuestion ? [currentQuestion] : [], answers, conversationHistory)
-      
-      if (response.questions && response.questions.length > 0) {
-        const question = response.questions[0]
-        setCurrentQuestion({
-          id: Date.now(),
-          text: question.text,
-          type: question.type || 'input',
-          options: question.options || [],
+
+    const conversationHistory = []
+    let lastQuestion = null
+    messages.filter(m => m.role === 'user' || m.role === 'assistant').forEach((msg) => {
+      if (msg.role === 'assistant') {
+        lastQuestion = msg.content
+      } else if (msg.role === 'user' && lastQuestion) {
+        conversationHistory.push({
+          question: lastQuestion,
+          answer: msg.content,
         })
-        
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          role: 'assistant',
-          content: question.text,
-          options: question.options || [],
-        }])
-        
-        setInputValue('')
-      } else {
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          role: 'system',
-          content: '信息已足够！正在为你生成详细的 SOP...',
-        }])
-        setPhase('generating')
-        await handleGenerate()
+        lastQuestion = null
       }
-    } catch (err) {
-      setError(err.message)
-      playError()
-      setCurrentSop(mockSOP)
-      navigate('/editor')
-    } finally {
-      setLoading(false)
-    }
+    })
+
+    const thinkingMessageId = Date.now()
+    setMessages(prev => [...prev, {
+      id: thinkingMessageId,
+      role: 'assistant',
+      content: '思考中...',
+      isStreaming: true,
+    }])
+
+    sopAPI.askStream(
+      goal,
+      currentQuestion ? [currentQuestion] : [],
+      answers,
+      conversationHistory,
+      {
+        onChunk: () => {
+          // 流式传输保持连接活跃，内容由 onDone 统一替换为解析后的问题
+        },
+        onDone: (response) => {
+          const followUpQuestions = response.questions || []
+
+          if (followUpQuestions.length > 0) {
+            const question = followUpQuestions[0]
+            setCurrentQuestion({
+              id: Date.now(),
+              text: question.text,
+              type: question.type || 'input',
+              options: question.options || [],
+            })
+
+            setMessages(prev => prev.map(msg =>
+              msg.id === thinkingMessageId
+                ? {
+                    ...msg,
+                    content: question.text,
+                    options: question.options || [],
+                    isStreaming: false,
+                  }
+                : msg
+            ))
+          } else {
+            setMessages(prev => prev.filter(msg => msg.id !== thinkingMessageId))
+            setMessages(prev => [...prev, {
+              id: Date.now(),
+              role: 'system',
+              content: '信息已足够！正在为你生成详细的 SOP...',
+            }])
+            setPhase('generating')
+            handleGenerate()
+          }
+
+          setLoading(false)
+          setInputValue('')
+        },
+        onError: (err) => {
+          setMessages(prev => prev.filter(msg => msg.id !== thinkingMessageId))
+          setError(err.message)
+          playError()
+          setCurrentSop(mockSOP)
+          navigate('/editor')
+          setLoading(false)
+        },
+      }
+    )
   }
 
   const handleSend = async (answer = null) => {
