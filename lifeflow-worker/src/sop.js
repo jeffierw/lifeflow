@@ -212,10 +212,7 @@ export class SOPHandler {
     const apiKey = this.env.OPENAI_API_KEY
 
     if (!apiKey) {
-      return createResponse({
-        questions: [],
-        message: '信息已足够，可以生成 SOP',
-      })
+      return this.streamAskResponse({ questions: [], message: '信息已足够，可以生成 SOP' })
     }
 
     let followUpQuestions = []
@@ -317,9 +314,31 @@ ${answers && Object.keys(answers).length > 0
       console.error('AI ask failed:', error)
     }
 
-    return createResponse({
+    return this.streamAskResponse({
       questions: followUpQuestions.slice(0, 1),
       message: followUpQuestions.length > 0 ? '需要更多信息' : '信息已足够，可以生成 SOP',
+    })
+  }
+
+  streamAskResponse(result) {
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+      start(controller) {
+        const content = JSON.stringify(result)
+        const chunk = JSON.stringify({ choices: [{ delta: { content } }] })
+        controller.enqueue(encoder.encode(`data: ${chunk}\n\n`))
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        controller.close()
+      }
+    })
+
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     })
   }
 

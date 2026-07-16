@@ -102,8 +102,13 @@ export default function SOPGenerator() {
       answers,
       conversationHistory,
       {
-        onChunk: () => {
-          // 流式传输保持连接活跃，内容由 onDone 统一替换为解析后的问题
+        onChunk: (_chunk, fullContent) => {
+          // 实时显示累积的 AI 输出（本地/无 API key 时可能是 JSON 文本）
+          setMessages(prev => prev.map(msg =>
+            msg.id === thinkingMessageId
+              ? { ...msg, content: fullContent }
+              : msg
+          ))
         },
         onDone: (response) => {
           const followUpQuestions = response.questions || []
