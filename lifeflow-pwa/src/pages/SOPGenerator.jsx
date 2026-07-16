@@ -327,7 +327,7 @@ export default function SOPGenerator() {
                     rows={1}
                     className="flex-1 h-10 border-2 border-[#ffd4b8] bg-white focus:border-[#ff8c42] focus:ring-2 focus:ring-[#ff8c42]/20 resize-none"
                   />
-                  <Button onClick={handleSend} disabled={!inputValue.trim() || loading}>
+                  <Button onClick={() => handleSend()} disabled={!inputValue.trim() || loading}>
                     <Send size={16} className="mr-1" />
                     发送
                   </Button>
