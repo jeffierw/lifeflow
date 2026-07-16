@@ -29,10 +29,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Write production env
+        run: |
+          echo "VITE_API_BASE=${{ vars.VITE_API_BASE }}" > .env.production
+          echo "Build-time VITE_API_BASE: ${{ vars.VITE_API_BASE }}"
+
       - name: Build PWA
         run: npm run build
         env:
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+
+      - name: Verify bundle does not contain localhost
+        run: |
+          if grep -R "http://localhost:8787" dist/ 2>/dev/null; then
+            echo "Error: built bundle still contains localhost API base"
+            exit 1
+          fi
+          echo "Bundle API base OK"
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
