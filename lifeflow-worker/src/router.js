@@ -8,26 +8,41 @@ export class Router {
   }
 
   async handle() {
-    if (this.method === 'OPTIONS') {
+    const tStart = Date.now()
+    const method = this.method
+    const path = this.path
+
+    if (method === 'OPTIONS') {
+      console.log(`[REQ] ${method} ${path} → 204 preflight (${Date.now() - tStart}ms)`)
       return this.corsResponse()
     }
 
-    if (this.path.startsWith('/api/auth')) {
-      return this.withCors(this.handleAuth())
+    let promise
+    if (path.startsWith('/api/auth')) {
+      promise = this.handleAuth()
+    } else if (path.startsWith('/api/invite')) {
+      promise = this.handleInvite()
+    } else if (path.startsWith('/api/sop')) {
+      promise = this.handleSOP()
+    } else if (path.startsWith('/api/quota')) {
+      promise = this.handleQuota()
+    } else if (path.startsWith('/api/settings')) {
+      promise = this.handleSettings()
+    } else {
+      promise = this.notFound()
     }
-    if (this.path.startsWith('/api/invite')) {
-      return this.withCors(this.handleInvite())
-    }
-    if (this.path.startsWith('/api/sop')) {
-      return this.withCors(this.handleSOP())
-    }
-    if (this.path.startsWith('/api/quota')) {
-      return this.withCors(this.handleQuota())
-    }
-    if (this.path.startsWith('/api/settings')) {
-      return this.withCors(this.handleSettings())
-    }
-    return this.withCors(this.notFound())
+
+    const wrapped = promise.then(resp => {
+      const dur = Date.now() - tStart
+      console.log(`[REQ] ${method} ${path} → ${resp?.status || 0} (${dur}ms)`)
+      return resp
+    }).catch(err => {
+      const dur = Date.now() - tStart
+      console.error(`[REQ] ${method} ${path} → ERROR (${dur}ms):`, err?.message || err)
+      throw err
+    })
+
+    return this.withCors(wrapped)
   }
 
   async withCors(promise) {
