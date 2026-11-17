@@ -89,6 +89,12 @@ export default function SOPEditor() {
 
   const handleRemoveStep = (stepIndex) => {
     const step = sop.steps[stepIndex]
+    const dependants = sop.steps.filter(item => item.dependencies?.includes(step.id))
+    if (dependants.length) {
+      setError(`不能删除前置步骤，以下步骤仍依赖它：${dependants.map(item => item.title).join('、')}`)
+      return
+    }
+    setError('')
     setDeletedSteps(prev => [...prev, { step, index: stepIndex }])
     
     const newSop = { 
