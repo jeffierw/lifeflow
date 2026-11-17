@@ -18,7 +18,9 @@ export class Router {
     }
 
     let promise
-    if (path.startsWith('/api/auth')) {
+    if (path.startsWith('/api/executions')) {
+      promise = import('./execution.js').then(({ ExecutionHandler }) => new ExecutionHandler(this.request, this.env).handle())
+    } else if (path.startsWith('/api/auth')) {
       promise = this.handleAuth()
     } else if (path.startsWith('/api/invite')) {
       promise = this.handleInvite()
