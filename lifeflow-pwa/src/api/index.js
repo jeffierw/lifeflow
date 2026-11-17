@@ -119,9 +119,9 @@ export const sopAPI = {
           onDone: (fullContent) => {
             try {
               const jsonMatch = fullContent.match(/\{[\s\S]*\}/)
-              const result = jsonMatch
-                ? JSON.parse(jsonMatch[0])
-                : { questions: [], message: '信息已足够，可以生成 SOP' }
+              if (!jsonMatch) throw new Error('无效的 AI 回复')
+              const result = JSON.parse(jsonMatch[0])
+              if (!Array.isArray(result.questions)) throw new Error('无效的追问结果')
               callbacks.onDone?.(result)
             } catch (err) {
               callbacks.onError?.(new Error('解析 AI 回复失败'))

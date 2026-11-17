@@ -11,26 +11,9 @@ import { useSound } from '../hooks/useSound'
 
 const exampleGoals = [
   '今晚 7 点前准备四菜一汤',
-  '周六上午完成全屋清洁',
-  '明天带孩子出门露营，需要准备行李',
-  '孩子睡前流程',
+  '30 分钟内准备两人份晚餐',
+  '用冰箱里的食材做一顿午饭',
 ]
-
-const mockSOP = {
-  id: 'mock-' + Date.now(),
-  title: '家庭晚餐：四菜一汤',
-  goal: '今晚 7 点前准备四菜一汤',
-  constraints: {},
-  steps: [
-    { id: 1, title: '准备工作', duration: 5, description: '洗手、系围裙、准备好所有厨具', status: 'pending', dependencies: [] },
-    { id: 2, title: '处理食材', duration: 15, description: '洗净蔬菜、切配肉类', status: 'pending', dependencies: [] },
-    { id: 3, title: '烹饪主菜', duration: 30, description: '依次烹饪四道菜', status: 'pending', dependencies: [2] },
-    { id: 4, title: '煮汤', duration: 20, description: '准备汤品', status: 'pending', dependencies: [2] },
-    { id: 5, title: '出锅摆盘', duration: 5, description: '所有菜品装盘', status: 'pending', dependencies: [3, 4] },
-  ],
-  estimatedTotalTime: 75,
-  createdAt: new Date().toISOString(),
-}
 
 const MAX_QUESTIONS = 7
 
@@ -74,6 +57,7 @@ export default function SOPGenerator() {
   const conversationHistoryRef = useRef([])
   const answersRef = useRef({})
   const constraintsRef = useRef({})  // 保留后端 enrich 后的 _gatekeeper
+  const retryCountRef = useRef(0)
 
   useEffect(() => {
     if (chatRef.current) {
@@ -104,6 +88,7 @@ export default function SOPGenerator() {
     conversationHistoryRef.current = []
     answersRef.current = {}
     constraintsRef.current = {}
+    retryCountRef.current = 0
     askQuestion()
   }
 
@@ -144,12 +129,17 @@ export default function SOPGenerator() {
           if (followUpQuestions.length > 0) {
             const question = followUpQuestions[0]
             if (isDuplicateQuestion(question.text, history)) {
+              if (++retryCountRef.current > 2) {
+                setError('AI 重复追问，请补充目标后重试。')
+                setLoading(false)
+                return
+              }
               finalizeThinking('发现重复问题，继续追问…')
               askQuestion()
-              setLoading(false)
               setInputValue('')
               return
             }
+            retryCountRef.current = 0
             setCurrentQuestion({
               id: Date.now(),
               text: question.text,
@@ -175,8 +165,6 @@ export default function SOPGenerator() {
         onError: (err) => {
           setError(err.message)
           playError()
-          setCurrentSop(mockSOP)
-          navigate('/editor')
           setLoading(false)
         },
       }
@@ -255,15 +243,15 @@ export default function SOPGenerator() {
       setGatekeeper(null)
       setBlockReason('')
 
-      const sop = response.sop || mockSOP
+      const sop = response.sop
+      if (!sop?.id || !sop.steps?.length) throw new Error('未收到有效流程，请重试')
       setCurrentSop(sop)
       playSuccess()
       navigate('/editor')
     } catch (err) {
       setError(err.message)
       playError()
-      setCurrentSop(mockSOP)
-      navigate('/editor')
+      setPhase('chat')
     } finally {
       setLoading(false)
     }
@@ -286,6 +274,10 @@ export default function SOPGenerator() {
       }
     }
     // 所有 followup 都重复了，重新触发 generate
+    if (++retryCountRef.current > 2) {
+      setError('信息审核重复，请补充条件或返回修改目标。')
+      return
+    }
     setTimeout(() => {
       setPhase('generating')
       handleGenerate()
@@ -362,7 +354,11 @@ export default function SOPGenerator() {
         )}
 
         {(phase === 'chat' || phase === 'generating') && (
-          <div className="space-y-4">
+            <div className="space-y-4">
+              {error && <div role="alert" className="text-red-700 p-3 border border-red-200 rounded">
+                {error}
+                <Button variant="secondary" onClick={() => { setError(''); retryCountRef.current = 0; askQuestion() }} disabled={loading}>重试</Button>
+              </div>}
             {/* 质量评估与报告输出已移入后端，前端不再展示；仅保留用于内部追问的 followup 处理。 */}
 
             {/* ========== 对话区 ========== */}

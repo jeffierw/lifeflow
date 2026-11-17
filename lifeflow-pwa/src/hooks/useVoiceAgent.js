@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { parseVoiceCommand } from '../lib/voiceCommands'
 
 // Agent 类型定义：根据步骤内容关键词匹配专业 Agent
 export const AGENT_TYPES = {
@@ -48,16 +49,6 @@ const EMERGENCY_KEYWORDS = [
   { keywords: ['救命', '帮忙', '不行了'], type: 'general', instruction: '请保持冷静。如情况严重，请立即拨打120急救电话。' },
 ]
 
-// 语音指令
-const VOICE_COMMANDS = [
-  { keywords: ['下一步', '下一个', '继续', '好了', '完成了', '完了'], command: 'next' },
-  { keywords: ['上一步', '上一个', '回去', '退回'], command: 'prev' },
-  { keywords: ['重复', '再说一遍', '再说', '重听'], command: 'repeat' },
-  { keywords: ['暂停', '停一下', '等一下', '停下来'], command: 'pause' },
-  { keywords: ['继续播放', '继续说', '接着说'], command: 'resume' },
-  { keywords: ['跳过', '不要这步'], command: 'skip' },
-]
-
 // 根据步骤文本匹配 Agent 类型
 export function detectAgentType(stepText) {
   if (!stepText) return null
@@ -82,16 +73,6 @@ function detectEmergency(transcript) {
   for (const emergency of EMERGENCY_KEYWORDS) {
     if (emergency.keywords.some(kw => transcript.includes(kw))) {
       return emergency
-    }
-  }
-  return null
-}
-
-// 检测语音指令
-function detectCommand(transcript) {
-  for (const cmd of VOICE_COMMANDS) {
-    if (cmd.keywords.some(kw => transcript.includes(kw))) {
-      return cmd.command
     }
   }
   return null
@@ -130,15 +111,12 @@ export function useVoiceAgent(options = {}) {
   const onCommandRef = useRef(onCommand)
   const onEmergencyRef = useRef(onEmergency)
   const onQuestionRef = useRef(onQuestion)
-  const allKeywordsRef = useRef([...speechKeywords])
-  const lastTranscriptRef = useRef('')
   const lastCommandTimeRef = useRef(0)
 
   // 更新 refs
   onCommandRef.current = onCommand
   onEmergencyRef.current = onEmergency
   onQuestionRef.current = onQuestion
-  allKeywordsRef.current = [...speechKeywords, ...VOICE_COMMANDS.flatMap(c => c.keywords)]
 
   // TTS
   const [voices, setVoices] = useState([])
@@ -230,8 +208,7 @@ export function useVoiceAgent(options = {}) {
 
   // 语音识别处理
   const handleTranscript = useCallback((transcript) => {
-    if (!transcript || transcript === lastTranscriptRef.current) return
-    lastTranscriptRef.current = transcript
+    if (!transcript) return
 
     // 1. 紧急检测（最高优先级）
     const emergency = detectEmergency(transcript)
@@ -243,7 +220,7 @@ export function useVoiceAgent(options = {}) {
     }
 
     // 2. 语音指令检测
-    const command = detectCommand(transcript)
+    const command = parseVoiceCommand(transcript, speechKeywords)
     if (command) {
       const now = Date.now()
       if (now - lastCommandTimeRef.current > 800) {
@@ -255,20 +232,6 @@ export function useVoiceAgent(options = {}) {
         onCommandRef.current?.(command, transcript)
       }
       return
-    }
-
-    // 3. 关键词检测（用户自定义关键词，如"下一步"、"哈吉米"）
-    if (speechKeywords.length > 0) {
-      const matchedKeyword = speechKeywords.find(kw => transcript.includes(kw))
-      if (matchedKeyword) {
-        const now = Date.now()
-        if (now - lastCommandTimeRef.current > 800) {
-          lastCommandTimeRef.current = now
-          if (speakingRef.current) stopSpeaking()
-          onCommandRef.current?.('next', transcript)
-        }
-        return
-      }
     }
 
     // 4. 自由提问（非指令、非紧急的语音输入）

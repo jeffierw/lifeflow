@@ -20,9 +20,9 @@ const sopStore = create((set) => ({
     stepIndex: Math.max(state.stepIndex - 1, 0),
   })),
   
-  startExecution: () => set({ isExecuting: true, stepIndex: 0, timerSeconds: 0 }),
+  startExecution: () => set({ isExecuting: true }),
   
-  stopExecution: () => set({ isExecuting: false, timerSeconds: 0 }),
+  stopExecution: () => set({ isExecuting: false }),
   
   incrementTimer: () => set((state) => ({ timerSeconds: state.timerSeconds + 1 })),
   

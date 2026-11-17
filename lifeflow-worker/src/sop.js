@@ -6,22 +6,7 @@ import {
   extractUser,
   calculateTokens
 } from './utils'
-
-const mockSOP = {
-  title: '家庭晚餐：四菜一汤',
-  steps: [
-    { id: 1, title: '准备工作', duration: 5, description: '洗手、系围裙、准备好所有厨具', status: 'pending', dependencies: [] },
-    { id: 2, title: '处理玉米排骨汤', duration: 45, description: '排骨焯水后放入电饭煲，加入玉米、姜片，加水炖煮', status: 'pending', dependencies: [] },
-    { id: 3, title: '处理清蒸鲈鱼', duration: 10, description: '鲈鱼洗净，用料酒和姜片腌制 10 分钟', status: 'pending', dependencies: [2] },
-    { id: 4, title: '切配食材', duration: 15, description: '番茄切块、青椒切丝、青菜洗净、肉丝备好', status: 'pending', dependencies: [2] },
-    { id: 5, title: '蒸鲈鱼', duration: 8, description: '蒸锅水开后放入鲈鱼，蒸 8 分钟', status: 'pending', dependencies: [3] },
-    { id: 6, title: '炒番茄炒蛋', duration: 6, description: '先炒蛋盛出，再炒番茄，最后混合', status: 'pending', dependencies: [4] },
-    { id: 7, title: '炒青椒肉丝', duration: 8, description: '先炒肉丝盛出，再炒青椒，最后混合', status: 'pending', dependencies: [4] },
-    { id: 8, title: '炒青菜', duration: 3, description: '快速翻炒青菜，加少许盐调味', status: 'pending', dependencies: [6, 7] },
-    { id: 9, title: '出锅摆盘', duration: 5, description: '鲈鱼出锅淋上蒸鱼豉油，所有菜装盘', status: 'pending', dependencies: [5, 6, 7, 8] },
-  ],
-  estimatedTotalTime: 60,
-}
+import { validatePlan } from './planValidation.js'
 
 // ===== 性能埋点工具 =====
 function createTimer(label) {
@@ -225,7 +210,9 @@ ${answersText || '暂无'}
         ...opts,
       })
       const result = await this.extractJsonFromResponse(response, 'gatekeeper-parse')
-      if (!Array.isArray(result.questions)) result.questions = []
+      if (!Array.isArray(result.questions) || result.questions.some(q => !q || typeof q.text !== 'string' || !q.text.trim())) {
+        throw new Error('Invalid clarification response')
+      }
       // 强制所有问题允许自定义输入：type=input，options 清空
       result.questions = result.questions.map((q) => ({
         id: q.id || generateId(),
@@ -313,8 +300,8 @@ ${answersText || '暂无'}
       sopData = await this.callAIAPIGenerate(goal, constraints, gateSummary)
       timer.mark('aiCall')
     } catch (error) {
-      console.error('AI API call failed, fallback to mock:', error.message)
-      sopData = { ...mockSOP, title: goal }
+      console.error('AI generation failed:', error.message)
+      return createError('生成失败，原有流程未改变。请稍后重试。', 502)
     }
 
     // 二次校验：不允许"第1步叫 确定菜单"这种泛化步骤 — 把这些找出来并拦截
@@ -415,27 +402,7 @@ ${historyText || '暂无'}
     })
 
     const sop = await this.extractJsonFromResponse(response, 'generate-parse')
-    if (!sop.steps || !Array.isArray(sop.steps)) sop.steps = mockSOP.steps
-    // 统一字段名兼容（estimated_total_time / estimatedTotalTime）
-    const et = sop.estimated_total_time || sop.estimatedTotalTime
-    if (!et) {
-      // 按关键路径求 max，而不是累加（并行步骤修正）
-      const n = sop.steps.length
-      const end = new Array(n + 1).fill(0)
-      for (const step of sop.steps) {
-        const id = step.id
-        const deps = step.dependencies || []
-        const base = deps.length ? Math.max(...deps.map(d => end[d] || 0)) : 0
-        end[id] = base + (step.duration || 0)
-      }
-      sop.estimatedTotalTime = Math.max(...Object.values(end), 5)
-    } else {
-      sop.estimatedTotalTime = et
-    }
-    delete sop.estimated_total_time
-    // status 归一
-    sop.steps = sop.steps.map(s => ({ ...s, status: s.status || 'pending' }))
-    return sop
+    return validatePlan(sop)
   }
 
   // ===================== ask 接口（流式） =====================
@@ -453,7 +420,7 @@ ${historyText || '暂无'}
 
     const apiKey = this.env.OPENAI_API_KEY
     if (!apiKey) {
-      return this.streamAskResponse({ questions: [], message: '信息已足够，可以生成 SOP' })
+      return createError('AI 服务未配置', 503)
     }
 
     // 快速退出：已达7轮 → 直接结束
@@ -529,10 +496,7 @@ type规则：是否题用choice+是/否；选择题用choice(≤4个选项)；�
       timer.done()
     }
 
-    return this.streamAskResponse({
-      questions: [],
-      message: '信息已足够，可以生成 SOP',
-    })
+    return createError('AI 信息收集失败，请重试', 502)
   }
 
   streamAskResponse(result) {
@@ -632,7 +596,7 @@ ${missingIngredientsHint}`
       // 注入历史对话（最近6轮，避免token爆炸）
       const recentHistory = history.slice(-12)
       for (const h of recentHistory) {
-        if (h && h.role && h.content) messages.push({ role: h.role, content: h.content })
+        if (h && ['user', 'assistant'].includes(h.role) && typeof h.content === 'string') messages.push({ role: h.role, content: h.content.slice(0, 2000) })
       }
       messages.push({ role: 'user', content: message })
 
