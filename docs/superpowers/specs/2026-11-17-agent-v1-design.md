@@ -6,8 +6,8 @@ Turn the existing SOP generator and execution chat into a single task agent
 that reads authoritative execution state, proposes changes to unfinished work,
 and applies only the exact change the user has approved.
 
-The architecture was approved in chat. The V1 scope below is proposed for
-implementation-plan review; no production implementation is included yet.
+The architecture and V1 scope were approved in chat. Implementation is tracked
+in the companion plan and incremental Git commits.
 
 ## Approaches
 

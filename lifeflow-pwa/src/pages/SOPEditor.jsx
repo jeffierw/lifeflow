@@ -20,6 +20,7 @@ export default function SOPEditor() {
   const [editingStep, setEditingStep] = useState(null)
   const [editingField, setEditingField] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [deletedSteps, setDeletedSteps] = useState([])
   const [dragIndex, setDragIndex] = useState(null)
   const [touchStartY, setTouchStartY] = useState(null)
@@ -39,6 +40,7 @@ export default function SOPEditor() {
       const response = await sopAPI.getById(id)
       setSop(response.sop)
     } catch (err) {
+      setError(err.message)
       console.error(err)
     } finally {
       setLoading(false)
@@ -54,6 +56,7 @@ export default function SOPEditor() {
       setDeletedSteps([])
       navigate('/sops')
     } catch (err) {
+      setError(err.message)
       console.error(err)
     } finally {
       setLoading(false)
@@ -175,10 +178,19 @@ export default function SOPEditor() {
     setSop(newSop)
   }
 
-  const handleStartExecution = () => {
+  const handleStartExecution = async () => {
     if (!sop) return
-    setCurrentSop(sop)
-    navigate(`/execute/${sop.id || 'temp'}`)
+    setLoading(true)
+    setError('')
+    try {
+      await sopAPI.save(sop)
+      setCurrentSop(sop)
+      navigate(`/execute/${sop.id}`)
+    } catch (failure) {
+      setError(failure.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (loading) {
@@ -207,6 +219,7 @@ export default function SOPEditor() {
       <Header />
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+        {error && <p role="alert" className="text-red-700 mb-4">{error}</p>}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">编辑 SOP</h1>

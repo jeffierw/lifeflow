@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { parseVoiceCommand } from '../lib/voiceCommands'
 
+function controlRecognition(recognition, method) {
+  try {
+    recognition?.[method]()
+    return true
+  } catch {
+    return false
+  }
+}
+
 // Agent 类型定义：根据步骤内容关键词匹配专业 Agent
 export const AGENT_TYPES = {
   ingredient: {
@@ -79,8 +88,8 @@ function detectEmergency(transcript) {
 }
 
 /**
- * 全双工语音 Agent 钩子
- * - 持续监听，支持打断 AI 播报
+ * 语音输入输出钩子
+ * - 播报期间暂停监听，避免回声触发指令
  * - 自动 Agent 调度
  * - 紧急情况检测
  * - 语音指令识别
@@ -168,6 +177,7 @@ export function useVoiceAgent(options = {}) {
     speakingRef.current = true
     setIsSpeaking(true)
     setAgentState('speaking')
+    controlRecognition(recognitionRef.current, 'abort')
 
     utterance.onstart = () => {
       speakingRef.current = true
@@ -180,6 +190,7 @@ export function useVoiceAgent(options = {}) {
       setIsSpeaking(false)
       if (listeningRef.current) {
         setAgentState('listening')
+        controlRecognition(recognitionRef.current, 'start')
       } else {
         setAgentState('idle')
       }
@@ -190,6 +201,7 @@ export function useVoiceAgent(options = {}) {
       setIsSpeaking(false)
       if (listeningRef.current) {
         setAgentState('listening')
+        controlRecognition(recognitionRef.current, 'start')
       } else {
         setAgentState('idle')
       }
@@ -204,6 +216,9 @@ export function useVoiceAgent(options = {}) {
     }
     speakingRef.current = false
     setIsSpeaking(false)
+    if (listeningRef.current) {
+      controlRecognition(recognitionRef.current, 'start')
+    }
   }, [])
 
   // 语音识别处理
@@ -258,7 +273,7 @@ export function useVoiceAgent(options = {}) {
 
     // 先停止已有实例
     if (recognitionRef.current) {
-      try { recognitionRef.current.stop() } catch {}
+      controlRecognition(recognitionRef.current, 'stop')
       recognitionRef.current = null
     }
     if (restartTimerRef.current) {
@@ -275,6 +290,7 @@ export function useVoiceAgent(options = {}) {
     recognition.maxAlternatives = 1
 
     recognition.onresult = (event) => {
+      if (speakingRef.current) return
       let interimTranscript = ''
       let finalTranscript = ''
 
@@ -308,13 +324,13 @@ export function useVoiceAgent(options = {}) {
     }
 
     recognition.onend = () => {
-      if (listeningRef.current) {
+      if (listeningRef.current && !speakingRef.current && recognitionRef.current === recognition) {
         try {
           recognition.start()
         } catch {
           restartTimerRef.current = setTimeout(() => {
-            if (listeningRef.current && recognitionRef.current === recognition) {
-              try { recognition.start() } catch {}
+            if (listeningRef.current && !speakingRef.current && recognitionRef.current === recognition) {
+              controlRecognition(recognition, 'start')
             }
           }, 300)
         }
@@ -328,9 +344,10 @@ export function useVoiceAgent(options = {}) {
 
     try {
       recognition.start()
-    } catch (e) {
+    } catch {
       listeningRef.current = false
       setIsListening(false)
+      setAgentState('idle')
     }
   }, [stopSpeaking])
 
@@ -342,7 +359,7 @@ export function useVoiceAgent(options = {}) {
       restartTimerRef.current = null
     }
     if (recognitionRef.current) {
-      try { recognitionRef.current.stop() } catch {}
+      controlRecognition(recognitionRef.current, 'stop')
       recognitionRef.current = null
     }
     if (!speakingRef.current) {
@@ -377,7 +394,7 @@ export function useVoiceAgent(options = {}) {
     return () => {
       listeningRef.current = false
       if (recognitionRef.current) {
-        try { recognitionRef.current.stop() } catch {}
+        controlRecognition(recognitionRef.current, 'stop')
       }
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel()

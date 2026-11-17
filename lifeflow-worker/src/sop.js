@@ -687,6 +687,8 @@ ${missingIngredientsHint}`
     const body = await parseBody(this.request)
     const { id, title, goal, constraints, steps, estimatedTotalTime } = body
     if (!id) return createError('缺少 ID 参数', 400)
+    let plan
+    try { plan = validatePlan({ title, steps }) } catch (error) { return createError(error.message, 400) }
 
     const existing = await this.env.DB.prepare(
       'SELECT id FROM sops WHERE id = ? AND user_id = ?'
@@ -696,10 +698,10 @@ ${missingIngredientsHint}`
     await this.env.DB.prepare(
       'UPDATE sops SET title = ?, goal = ?, constraints = ?, steps = ?, estimated_total_time = ?, updated_at = ? WHERE id = ?'
     ).bind(
-      title, goal,
+      plan.title, goal || plan.title,
       JSON.stringify(constraints || {}),
-      JSON.stringify(steps || []),
-      estimatedTotalTime || 60,
+      JSON.stringify(plan.steps),
+      plan.estimatedTotalTime,
       Date.now(), id
     ).run()
 

@@ -17,7 +17,9 @@ const request = async (path, options = {}) => {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: '请求失败' }))
-    throw new Error(error.error || error.message || '请求失败')
+    const failure = new Error(error.error || error.message || '请求失败')
+    failure.status = response.status
+    throw failure
   }
 
   return response.json()
@@ -177,6 +179,19 @@ export const sopAPI = {
 
 export const quotaAPI = {
   getStatus: () => request('/api/quota/status'),
+}
+
+export const executionAPI = {
+  start: (sopId, requestId) => request('/api/executions', {
+    method: 'POST', body: JSON.stringify({ sopId, requestId }),
+  }),
+  get: id => request(`/api/executions/${encodeURIComponent(id)}`),
+  event: (id, event) => request(`/api/executions/${encodeURIComponent(id)}/events`, {
+    method: 'POST', body: JSON.stringify(event),
+  }),
+  agent: (id, message, history, signal) => request(`/api/executions/${encodeURIComponent(id)}/agent`, {
+    method: 'POST', body: JSON.stringify({ message, history }), signal,
+  }),
 }
 
 export const settingsAPI = {
