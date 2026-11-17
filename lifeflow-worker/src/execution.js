@@ -1,5 +1,6 @@
 import { extractUser, createResponse, createError } from './utils.js'
 import { ExecutionRepository } from './executionRepository.js'
+import { runAgentTurn } from './agent.js'
 
 const publicEvents = new Set([
   'start_step', 'complete_step', 'skip_step', 'pause', 'resume', 'create_timer',
@@ -34,6 +35,13 @@ export class ExecutionHandler {
       if (match?.[2] === 'events') {
         if (!publicEvents.has(body.type)) return createError('不允许的操作', 400)
         return createResponse(await this.repository.applyEvent(user.id, match[1], body))
+      }
+      if (match?.[2] === 'agent') {
+        if (user.quota_used >= user.quota_total) return createError('Token 配额已用完', 403)
+        return createResponse(await runAgentTurn({
+          user, executionId: match[1], message: body.message, history: body.history,
+          env: this.env, repository: this.repository,
+        }))
       }
       return createError('Not found', 404)
     } catch (error) {

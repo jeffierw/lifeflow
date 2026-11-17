@@ -119,7 +119,7 @@ export function transition(execution, event, now = Date.now()) {
       }
       const change = validatePlanChange(state, payload.steps)
       state.proposals = state.proposals.map(proposal => proposal.status === 'pending'
-        ? { ...proposal, status: 'superseded' } : proposal).slice(-19)
+        ? { ...proposal, status: 'superseded' } : proposal).slice(-4)
       state.proposals.push({
         id: event.requestId, baseRevision: state.revision + 1, status: 'pending',
         rationale: payload.rationale, steps: change.steps.filter(item => item.status === 'pending'),
